@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>我的网站</title>
+  <meta name="description" content="从0开始的个人网站" />
+  <style>
+    body{margin:0;font-family:system-ui,Arial}
+    header,footer{padding:20px;text-align:center}
+    .hero{min-height:70vh;display:grid;place-items:center;background:#f6f7fb}
+    .btn{display:inline-block;padding:10px 18px;border:1px solid #333;border-radius:8px;text-decoration:none}
+    .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));padding:20px;max-width:1000px;margin:auto}
+    .card{padding:16px;border:1px solid #e5e7eb;border-radius:12px}
+  </style>
+</head>
+<body>
+  <header><strong>我的网站</strong></header>
+  <section class="hero">
+    <div>
+      <h1>你好，世界 👋</h1>
+      <p>这是一个超简静态网站。</p>
+      <a class="btn" href="#features">看看功能</a>
+    </div>
+  </section>
+  <section id="features" class="grid">
+    <div class="card"><h3>快速</h3><p>纯静态部署，访问飞快。</p></div>
+    <div class="card"><h3>安全</h3><p>全站 HTTPS，无服务器维护。</p></div>
+    <div class="card"><h3>可扩展</h3><p>后续可加表单、评论、博客。</p></div>
+  </section>
+  <footer>© 2025 我</footer>
+</body>
+</html>
