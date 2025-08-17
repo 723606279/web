@@ -1,33 +1,385 @@
 <!doctype html>
+
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>小虾侠的网站</title>
-  <meta name="description" content="从0开始的个人网站" />
+  <title>炫酷 3D 照片画廊 · 纯前端</title>
+  <meta name="description" content="一个零依赖、纯前端的 3D 照片滑动画廊（左右滑动、自动播放、键盘控制、触控支持），适合直接部署到 GitHub Pages。" />
   <style>
-    body{margin:0;font-family:system-ui,Arial}
-    header,footer{padding:20px;text-align:center}
-    .hero{min-height:70vh;display:grid;place-items:center;background:#f6f7fb}
-    .btn{display:inline-block;padding:10px 18px;border:1px solid #333;border-radius:8px;text-decoration:none}
-    .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));padding:20px;max-width:1000px;margin:auto}
-    .card{padding:16px;border:1px solid #e5e7eb;border-radius:12px}
+    /* —— 可调整的主题变量 —— */
+    :root {
+      --bg-1: #0f1020;
+      --bg-2: #14162b;
+      --accent: #7cf3ff;
+      --accent-2: #9b5cff;
+      --glass: rgba(255,255,255,.08);
+      --glass-strong: rgba(255,255,255,.14);
+      --text: #e9ecf1;
+      --muted: #9aa4b2;
+      --slide-width: min(78vw, 980px);
+      --slide-height: min(56vw, 620px);
+      --gap: 220px;            /* 相邻卡片的水平间距 */
+      --depth-step: 140px;      /* Z 轴层叠深度（越大越有 3D 感） */
+      --rotate-step: -18deg;    /* 相邻卡片的 Y 轴旋转 */
+      --perspective: 1400px;    /* 视距 */
+      --radius: 22px;
+      --shadow: 0 20px 60px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35);
+      --shine: conic-gradient(from 210deg at 60% 0%, rgba(255,255,255,.18), rgba(255,255,255,0) 35%);
+    }* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  color: var(--text);
+  font: 15px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  background: radial-gradient(1200px 800px at 15% 10%, #1a1b36, transparent 60%),
+              radial-gradient(1000px 700px at 90% 0%, #1d0f33, transparent 55%),
+              linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  overflow: hidden; /* 全屏画廊 */
+}
+
+.app {
+  position: relative;
+  width: 100%; height: 100%;
+  display: grid; place-items: center;
+}
+
+.brand {
+  position: absolute; top: 16px; left: 18px;
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  box-shadow: 0 2px 10px rgba(0,0,0,.2) inset, 0 1px 0 rgba(255,255,255,.05);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  user-select: none;
+}
+.brand .dot { width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, var(--accent), var(--accent-2)); box-shadow: 0 0 18px rgba(124,243,255,.6); }
+.brand strong { font-weight: 650; letter-spacing: .15px; color: #f3f6ff; }
+.brand span { color: var(--muted); }
+
+.gallery {
+  width: 100%; height: 100%;
+  perspective: var(--perspective);
+  position: relative;
+}
+
+.track {
+  position: absolute; inset: 0; margin: auto;
+  width: var(--slide-width); height: var(--slide-height);
+  transform-style: preserve-3d;
+  will-change: transform;
+  pointer-events: none; /* 子元素接管事件 */
+}
+
+.slide {
+  position: absolute; inset: 0; margin: auto;
+  width: 100%; height: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transform-style: preserve-3d;
+  transition: transform 600ms cubic-bezier(.2,.7,0,1), filter 600ms, opacity 600ms;
+  will-change: transform, opacity, filter;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background: #0b0f18;
+  isolation: isolate;
+}
+
+.slide::before { /* 玻璃高光 */
+  content: ""; position: absolute; inset: 0;
+  background: var(--shine);
+  opacity: .55; mix-blend-mode: overlay; pointer-events: none;
+}
+
+.slide img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transform: translateZ(0);
+  filter: saturate(1.05);
+}
+
+.caption {
+  position: absolute; left: 16px; bottom: 14px; right: 16px;
+  padding: 10px 12px; border-radius: 14px;
+  background: linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.45));
+  color: #eaf2ff; font-weight: 600; letter-spacing: .3px;
+  text-shadow: 0 2px 14px rgba(0,0,0,.65);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35) inset, 0 1px 0 rgba(255,255,255,.06);
+}
+
+/* 控件 */
+.controls { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.arrows { width: calc(var(--slide-width) + 200px); display: flex; justify-content: space-between; align-items: center; }
+
+.btn {
+  pointer-events: all;
+  width: 54px; height: 54px; border-radius: 999px; border: 0;
+  background: linear-gradient(180deg, var(--glass-strong), var(--glass));
+  color: var(--text); cursor: pointer;
+  display: grid; place-items: center; isolation: isolate;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.05) inset;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 16px 40px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.05) inset; }
+.btn:active { transform: translateY(1px) scale(.98); }
+.btn svg { width: 26px; height: 26px; opacity: .92; }
+
+.dots {
+  pointer-events: all;
+  position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+  box-shadow: 0 6px 24px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.05) inset;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.dot {
+  width: 9px; height: 9px; border-radius: 999px; border: 0; cursor: pointer; background: rgba(255,255,255,.36);
+  transition: transform .25s ease, background .25s ease, box-shadow .25s ease;
+}
+.dot[aria-current="true"] { background: linear-gradient(180deg, var(--accent), var(--accent-2)); transform: scale(1.35); box-shadow: 0 0 16px rgba(124,243,255,.55); }
+
+.kbd { position: absolute; right: 16px; bottom: 16px; color: var(--muted); font-size: 12px; opacity: .8; user-select: none; }
+
+/* 顶部进度条 */
+.progress {
+  position: absolute; top: 0; left: 0; height: 3px; width: 100%; background: linear-gradient(90deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+}
+.progress .bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); box-shadow: 0 0 16px rgba(124,243,255,.65); }
+
+/* 自适应 */
+@media (max-width: 840px) {
+  :root { --gap: 170px; --rotate-step: -16deg; --depth-step: 120px; --perspective: 1100px; }
+  .btn { width: 48px; height: 48px; }
+  .btn svg { width: 22px; height: 22px; }
+}
+
+@media (max-width: 540px) {
+  :root { --gap: 140px; --rotate-step: -14deg; --depth-step: 100px; --perspective: 950px; --slide-height: min(70vw, 72vh); }
+  .brand { display: none; }
+}
+
+/* 浮动光斑装饰 */
+.glow { position: absolute; width: 500px; height: 500px; border-radius: 50%; filter: blur(60px); opacity: .18; pointer-events: none; mix-blend-mode: screen; }
+.glow.a { background: #5cf1ff; top: -120px; left: -120px; animation: drift 18s ease-in-out infinite alternate; }
+.glow.b { background: #b47cff; bottom: -120px; right: -120px; animation: drift 22s ease-in-out infinite alternate; }
+@keyframes drift { from { transform: translate(0,0) } to { transform: translate(40px, 50px) } }
+
   </style>
 </head>
 <body>
-  <header><strong>小虾侠的网站</strong></header>
-  <section class="hero">
-    <div>
-      <h1>你好，游客 👋</h1>
-      <p>这是小虾侠的个人网站。</p>
-      <a class="btn" href="#features">看看功能</a>
+  <!--
+    部署到 GitHub Pages 的最简步骤：
+    1) 新建一个 GitHub 仓库（Public）。
+    2) 把本文件命名为 index.html 放进仓库根目录，commit & push。
+    3) 在仓库 Settings → Pages：Source 选 main 分支 /root，保存；等待几分钟即可访问。
+    4) 替换下方 images[] 数组里的图片链接，或把图片放进 /images 目录并用相对路径。
+  -->
+  <div class="app" id="app" aria-label="炫酷 3D 照片画廊">
+    <div class="brand" aria-hidden="true">
+      <span class="dot"></span>
+      <strong>Gallery</strong><span> · 3D Slider</span>
+    </div><div class="gallery" id="gallery">
+  <div class="track" id="track" role="list" aria-live="polite"></div>
+
+  <div class="controls">
+    <div class="arrows">
+      <button class="btn" id="prev" aria-label="上一张（←）">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="btn" id="next" aria-label="下一张（→）">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
     </div>
-  </section>
-  <section id="features" class="grid">
-    <div class="card"><h3>快速</h3><p>纯静态部署，访问飞快。</p></div>
-    <div class="card"><h3>安全</h3><p>全站 HTTPS，无服务器维护。</p></div>
-    <div class="card"><h3>可扩展</h3><p>后续可加表单、评论、博客。</p></div>
-  </section>
-  <footer>© 2025 我</footer>
-</body>
+
+    <div class="dots" id="dots" aria-label="跳转到指定图片"></div>
+  </div>
+
+  <div class="progress" aria-hidden="true"><div class="bar" id="bar"></div></div>
+</div>
+
+<div class="kbd">支持：触控滑动 / 鼠标滚轮 / 键盘 ← →</div>
+
+<div class="glow a"></div>
+<div class="glow b"></div>
+
+  </div>  <script>
+    // ———— 1) 配置你的图片（可替换为本地 /images/*.jpg 相对路径） ————
+    const images = [
+      { src: "https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1600&auto=format&fit=crop", alt: "抽象霓虹背景", caption: "Neon Abstract" },
+      { src: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop", alt: "雪山与星空", caption: "Milky Way over Peaks" },
+      { src: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop", alt: "沙漠公路", caption: "Desert Highway" },
+      { src: "https://images.unsplash.com/photo-1491553895911-0055eca6402d?q=80&w=1600&auto=format&fit=crop", alt: "城市夜景", caption: "City Nights" },
+      { src: "https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?q=80&w=1600&auto=format&fit=crop", alt: "森林日出", caption: "Forest Sunrise" },
+      { src: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?q=80&w=1600&auto=format&fit=crop", alt: "海边悬崖", caption: "Sea Cliffs" }
+    ];
+
+    // ———— 2) 生成 DOM ————
+    const track = document.getElementById('track');
+    const dotsEl = document.getElementById('dots');
+    const bar = document.getElementById('bar');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+
+    let current = 0; // 当前索引
+    let autoplayMs = 4200; // 自动播放间隔
+    let autoTimer = null;
+    let isHovering = false;
+
+    function createSlide({src, alt, caption}, i) {
+      const li = document.createElement('article');
+      li.className = 'slide';
+      li.setAttribute('role', 'listitem');
+      li.setAttribute('data-index', i);
+
+      const img = document.createElement('img');
+      img.alt = alt || '';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      // 利用小技巧：先不设置 src，稍后用 IntersectionObserver 懒加载
+      img.dataset.src = src;
+
+      const cap = document.createElement('div');
+      cap.className = 'caption';
+      cap.textContent = caption || '';
+
+      li.appendChild(img);
+      li.appendChild(cap);
+      return li;
+    }
+
+    const slides = images.map(createSlide);
+    slides.forEach(s => track.appendChild(s));
+
+    // dots
+    images.forEach((_, i) => {
+      const b = document.createElement('button');
+      b.className = 'dot';
+      b.setAttribute('aria-label', `跳转到第 ${i+1} 张`);
+      b.addEventListener('click', () => jumpTo(i));
+      dotsEl.appendChild(b);
+    });
+
+    // 懒加载
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const img = e.target;
+          if (!img.src) img.src = img.dataset.src;
+          io.unobserve(img);
+        }
+      });
+    }, { root: track, rootMargin: '200px' });
+    slides.forEach(slide => io.observe(slide.querySelector('img')));
+
+    // ———— 3) 渲染函数（核心 3D 布局） ————
+    const N = images.length;
+    function mod(n, m){ return ((n % m) + m) % m; }
+    function offsetOf(i){
+      let raw = i - current;
+      if (raw > N/2) raw -= N; else if (raw < -N/2) raw += N;
+      return raw; // -N/2..N/2 之间的最短偏移
+    }
+
+    function render(progress = 0){
+      // progress ∈ [-1, 1]，用于拖拽时的小幅过渡感
+      slides.forEach((slide, i) => {
+        const off = offsetOf(i) - progress; // 拖拽时稍微反向偏移
+        const abs = Math.abs(off);
+        const x = off * parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap'));
+        const z = -abs * parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--depth-step'));
+        const ry = `calc(${off} * var(--rotate-step))`;
+        const scale = Math.max(.56, 1 - abs * .08 - Math.pow(abs, 1.35) * .02);
+
+        slide.style.transform = `translate3d(${x}px, 0, ${z}px) rotateY(${ry}) scale(${scale})`;
+        slide.style.zIndex = String(1000 - Math.round(abs * 10));
+        slide.style.opacity = String(1 - Math.min(.06 * abs, .55));
+        slide.style.filter = `blur(${Math.max(0, abs - 1) * 1.1}px)`;
+        slide.setAttribute('aria-hidden', abs > .01);
+      });
+
+      // 进度条（自动播放时使用 CSS 动画感）
+      const pct = (mod(current, N) + 1) / N * 100;
+      bar.style.width = pct + '%';
+
+      // dot 高亮
+      ;[...dotsEl.children].forEach((d, i) => {
+        d.setAttribute('aria-current', i === mod(current, N));
+      });
+    }
+
+    function jumpTo(i){ current = mod(i, N); render(); restartAutoplay(); }
+    function next(){ current = mod(current + 1, N); render(); }
+    function prev(){ current = mod(current - 1, N); render(); }
+
+    // ———— 4) 交互：按钮 / 键盘 / 滚轮 / 触控拖拽 ————
+    nextBtn.addEventListener('click', next);
+    prevBtn.addEventListener('click', prev);
+
+    // 键盘
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') next();
+      else if (e.key === 'ArrowLeft') prev();
+    });
+
+    // 滚轮（水平/垂直都可）
+    let wheelLock = false;
+    window.addEventListener('wheel', (e) => {
+      if (wheelLock) return;
+      wheelLock = true; setTimeout(() => wheelLock = false, 300);
+      if (Math.abs(e.deltaX) + Math.abs(e.deltaY) < 6) return;
+      if (e.deltaX > 0 || e.deltaY > 0) next(); else prev();
+    }, { passive: true });
+
+    // 悬停暂停
+    document.getElementById('gallery').addEventListener('pointerenter', () => { isHovering = true; stopAutoplay(); });
+    document.getElementById('gallery').addEventListener('pointerleave', () => { isHovering = false; restartAutoplay(); });
+
+    // 触控 / 鼠标拖拽
+    let dragging = false, startX = 0, lastX = 0, progress = 0;
+    const DRAG_THRESHOLD = 60; // 超过则翻页
+
+    function onDown(e){
+      dragging = true; startX = (e.touches? e.touches[0].clientX : e.clientX); lastX = startX;
+      stopAutoplay();
+    }
+    function onMove(e){
+      if (!dragging) return;
+      const x = (e.touches? e.touches[0].clientX : e.clientX);
+      const dx = x - startX; lastX = x;
+      const w = Math.min(window.innerWidth, parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--slide-width')));
+      progress = Math.max(-1, Math.min(1, dx / w));
+      render(progress * .8);
+    }
+    function onUp(){
+      if (!dragging) return;
+      const dx = lastX - startX;
+      if (dx > DRAG_THRESHOLD) prev();
+      else if (dx < -DRAG_THRESHOLD) next();
+      else render(0);
+      dragging = false; progress = 0; if (!isHovering) restartAutoplay();
+    }
+
+    const gallery = document.getElementById('gallery');
+    gallery.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    gallery.addEventListener('touchstart', onDown, { passive: true });
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+
+    // 自动播放
+    function startAutoplay(){ if (autoTimer) return; autoTimer = setInterval(next, autoplayMs); }
+    function stopAutoplay(){ if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } }
+    function restartAutoplay(){ stopAutoplay(); startAutoplay(); }
+
+    // 初始渲染
+    render(); startAutoplay();
+
+    // 适配：窗口变化时重新渲染（保证数值生效）
+    window.addEventListener('resize', () => render());
+  </script></body>
 </html>
