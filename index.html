@@ -1,343 +1,684 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>炫酷 3D 照片画廊 · 纯前端（移动优化&防频闪）</title>
-  <meta name="description" content="零依赖 3D 照片滑动组件，修复背景频闪，优化手机/平板布局，邻近预加载，低性能设备自动降级。" />
-  <style>
-    /* —— 可调主题变量 —— */
-    :root {
-      --bg-1: #0f1020;
-      --bg-2: #14162b;
-      --accent: #7cf3ff;
-      --accent-2: #9b5cff;
-      --glass: rgba(255,255,255,.08);
-      --glass-strong: rgba(255,255,255,.14);
-      --text: #e9ecf1;
-      --muted: #9aa4b2;
-      --slide-width: min(88vw, 1100px);
-      --slide-height: min(64svh, 70vw, 720px);
-      --gap: 200px;           /* 相邻卡片水平间距 */
-      --depth-step: 120px;     /* Z 轴层叠深度 */
-      --rotate-step: -16deg;   /* 相邻卡片 Y 轴旋转 */
-      --perspective: 1200px;   /* 视距 */
-      --radius: 20px;
-      --shadow: 0 18px 60px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35);
-      --shine: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,0));
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天气查询</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
 
-    /* 1) 背景防频闪：把渐变放进固定层（独立合成层），主体用纯色 */
-    body { margin: 0; color: var(--text); font: 15px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Helvetica, Arial; background: var(--bg-1); overflow: hidden; }
-    body::before{
-      content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-      background:
-        radial-gradient(1200px 800px at 15% 10%, #1a1b36, transparent 60%),
-        radial-gradient(1000px 700px at 90% 0%, #1d0f33, transparent 55%),
-        linear-gradient(180deg, var(--bg-2), var(--bg-1));
-      transform: translateZ(0); will-change: transform, opacity; /* 独立图层，避免与 3D 滑块互相影响 */
-    }
+        /* 背景动画粒子 */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
 
-    .app { position: relative; width: 100%; height: 100%; display: grid; place-items: center; }
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            animation: float 15s infinite;
+        }
 
-    /* —— 隐藏品牌提示与“支持：”提示 —— */
-    .brand, .kbd { display: none !important; }
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0) translateX(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100vh) translateX(50px);
+                opacity: 0;
+            }
+        }
 
-    .gallery { width: 100%; height: 100%; perspective: var(--perspective); position: relative; contain: layout paint; /* 隔离绘制，减少全屏重绘 */ }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+        }
 
-    .track { position: absolute; inset: 0; margin: auto; width: var(--slide-width); height: var(--slide-height); transform-style: preserve-3d; will-change: transform; pointer-events: none; }
+        h1 {
+            text-align: center;
+            color: white;
+            font-size: 3rem;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+            animation: fadeInDown 1s ease;
+        }
 
-    .slide { position: absolute; inset: 0; margin: auto; width: 100%; height: 100%; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); transform-style: preserve-3d; transition: transform 560ms cubic-bezier(.2,.7,0,1), opacity 560ms; will-change: transform, opacity; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: #0b0f18; isolation: isolate; cursor: zoom-in; }
+        .subtitle {
+            text-align: center;
+            color: rgba(255,255,255,0.9);
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+            animation: fadeInDown 1s ease 0.2s backwards;
+        }
 
-    /* 2) 低性能/移动端：禁用混合模式，减少合成负担，进一步避免频闪 */
-    .slide::before { content: ""; position: absolute; inset: 0; background: var(--shine); opacity: .45; pointer-events: none; }
-    @media (max-width: 840px), (prefers-reduced-motion: reduce) {
-      .slide::before { opacity: .18; }
-    }
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
 
-    .slide img { width: 100%; height: 100%; object-fit: cover; display: block; transform: translateZ(0); }
+        .controls {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: fadeIn 1s ease 0.4s backwards;
+        }
 
-    .caption { position: absolute; left: 16px; bottom: 14px; right: 16px; padding: 10px 12px; border-radius: 14px; background: rgba(0,0,0,.35); color: #eaf2ff; font-weight: 600; letter-spacing: .3px; text-shadow: 0 2px 14px rgba(0,0,0,.65); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: 0 1px 0 rgba(255,255,255,.06) inset; }
+        .add-card-btn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
 
-    /* 控件：限制在画廊宽度内，避免小屏溢出 */
-    .controls { position: absolute; inset: 0; display: grid; pointer-events: none; }
-    .arrows { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(100vw - 24px, var(--slide-width)); display: flex; justify-content: space-between; align-items: center; padding: 0 6px; }
+        .add-card-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
 
-    .btn { pointer-events: all; width: 52px; height: 52px; border-radius: 999px; border: 0; background: linear-gradient(180deg, var(--glass-strong), var(--glass)); color: var(--text); cursor: pointer; display: grid; place-items: center; isolation: isolate; box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.05) inset; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: transform .2s ease, box-shadow .2s ease, background .2s ease; }
-    .btn:hover { transform: translateY(-1px); box-shadow: 0 16px 40px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.05) inset; }
-    .btn:active { transform: translateY(1px) scale(.98); }
-    .btn svg { width: 24px; height: 24px; opacity: .92; }
+        .add-card-btn:active {
+            transform: translateY(-1px);
+        }
 
-    .dots { pointer-events: all; position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 999px; background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); box-shadow: 0 6px 24px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.05) inset; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-    .dot { width: 9px; height: 9px; border-radius: 999px; border: 0; cursor: pointer; background: rgba(255,255,255,.36); transition: transform .25s ease, background .25s ease, box-shadow .25s ease; }
-    .dot[aria-current="true"] { background: linear-gradient(180deg, var(--accent), var(--accent-2)); transform: scale(1.35); box-shadow: 0 0 16px rgba(124,243,255,.55); }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
 
-    /* 顶部进度条 */
-    .progress { position: absolute; top: 0; left: 0; height: 3px; width: 100%; background: linear-gradient(90deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); }
-    .progress .bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); box-shadow: 0 0 16px rgba(124,243,255,.65); }
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            padding: 20px 0;
+        }
 
-    /* —— Lightbox（点击放大） —— */
-    .lightbox { position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.85); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
-    .lightbox.open { display: flex; }
-    .lightbox .stage { position: relative; max-width: 96vw; max-height: 92svh; }
-    .lightbox img { max-width: 96vw; max-height: 92svh; object-fit: contain; display: block; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
-    .lightbox .lb-cap { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(12px, env(safe-area-inset-bottom)); color:#eaf2ff; background: rgba(0,0,0,.45); padding: 8px 12px; border-radius: 10px; font-weight: 600; letter-spacing:.2px; }
-    .lightbox .hint { position: absolute; top: max(12px, env(safe-area-inset-top)); right: 16px; color:#cbd5e1; font-size:12px; opacity:.8; }
+        .weather-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 25px;
+            padding: 30px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.2);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+            animation: cardFadeIn 0.6s ease backwards;
+        }
 
-    /* 自适应：平板/手机尺寸优化，减小 3D 强度，保证不溢出 */
-    @media (max-width: 1024px) {
-      :root { --slide-width: min(94vw, 980px); --slide-height: min(62svh, 74vw, 660px); --gap: 170px; --depth-step: 110px; --rotate-step: -14deg; --perspective: 1100px; }
-      .btn { width: 48px; height: 48px; } .btn svg { width: 22px; height: 22px; }
-    }
-    @media (max-width: 640px) {
-      :root { --slide-width: 100vw; --slide-height: min(70svh, 88vw); --gap: 130px; --depth-step: 95px; --rotate-step: -12deg; --perspective: 980px; }
-      .dots { bottom: max(16px, env(safe-area-inset-bottom)); }
-      .glow { display:none; } /* 移动端禁用动画光斑，避免额外合成与闪烁 */
-      body { overflow: auto; } /* 小屏允许页面滚动，避免内容被裁切 */
-    }
+        @keyframes cardFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8) translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
 
-    /* 装饰光斑（桌面端保留） */
-    .glow { position: absolute; width: 520px; height: 520px; border-radius: 50%; filter: blur(60px); opacity: .18; pointer-events: none; mix-blend-mode: screen; }
-    .glow.a { background: #5cf1ff; top: -120px; left: -120px; animation: drift 18s ease-in-out infinite alternate; }
-    .glow.b { background: #b47cff; bottom: -120px; right: -120px; animation: drift 22s ease-in-out infinite alternate; }
-    @keyframes drift { from { transform: translate(0,0) } to { transform: translate(40px, 50px) } }
-  </style>
+        .weather-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 25px 70px rgba(0,0,0,0.3);
+        }
+
+        .weather-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.1) 100%);
+            pointer-events: none;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .city-name {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #333;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .city-name:hover {
+            border-bottom-color: #667eea;
+        }
+
+        .city-name:focus {
+            border-bottom-color: #f5576c;
+        }
+
+        .delete-btn {
+            background: linear-gradient(135deg, #ff6b6b, #ff5252);
+            color: white;
+            border: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 5px 15px rgba(255,82,82,0.3);
+        }
+
+        .delete-btn:hover {
+            transform: rotate(90deg) scale(1.1);
+            box-shadow: 0 8px 20px rgba(255,82,82,0.5);
+        }
+
+        .weather-icon {
+            font-size: 5rem;
+            text-align: center;
+            margin: 30px 0;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+
+        .temperature {
+            text-align: center;
+            font-size: 3.5rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .weather-desc {
+            text-align: center;
+            font-size: 1.3rem;
+            color: #666;
+            margin-bottom: 25px;
+            text-transform: capitalize;
+        }
+
+        .weather-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .detail-item {
+            text-align: center;
+            padding: 15px 10px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .detail-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .detail-icon {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+
+        .detail-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* 天气类型背景色 */
+        .weather-card.sunny {
+            background: linear-gradient(135deg, #FFF59D 0%, #FFE082 100%);
+        }
+
+        .weather-card.cloudy {
+            background: linear-gradient(135deg, #E0E0E0 0%, #BDBDBD 100%);
+        }
+
+        .weather-card.rainy {
+            background: linear-gradient(135deg, #90CAF9 0%, #64B5F6 100%);
+        }
+
+        .weather-card.snowy {
+            background: linear-gradient(135deg, #FFFFFF 0%, #E3F2FD 100%);
+        }
+
+        .weather-card.stormy {
+            background: linear-gradient(135deg, #78909C 0%, #546E7A 100%);
+        }
+
+        .refresh-icon {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-icon:hover {
+            opacity: 1;
+            transform: rotate(180deg);
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .subtitle {
+                font-size: 1rem;
+            }
+
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .temperature {
+                font-size: 2.5rem;
+            }
+
+            .weather-icon {
+                font-size: 4rem;
+            }
+        }
+
+        /* 加载动画 */
+        .loading {
+            position: relative;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-  <div class="app" id="app" aria-label="炫酷 3D 照片画廊">
-    <!-- 品牌提示与“支持：”提示已移除，以保持纯粹展示 -->
-
-    <div class="gallery" id="gallery">
-      <div class="track" id="track" role="list" aria-live="polite"></div>
-
-      <div class="controls">
-        <div class="arrows">
-          <button class="btn" id="prev" aria-label="上一张（←）">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <button class="btn" id="next" aria-label="下一张（→）">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
+    <div class="particles" id="particles"></div>
+    
+    <div class="container">
+        <h1>🌈 天气查询</h1>
+        <p class="subtitle">点击城市名可编辑（仅支持英文城市名：例如Beijing）</p>
+        
+        <div class="controls">
+            <button class="add-card-btn" onclick="addNewCard()">
+                ➕ 添加新卡片
+            </button>
         </div>
 
-        <div class="dots" id="dots" aria-label="跳转到指定图片"></div>
-      </div>
-
-      <div class="progress" aria-hidden="true"><div class="bar" id="bar"></div></div>
+        <div class="cards-grid" id="cardsGrid"></div>
     </div>
 
-    <div class="glow a"></div>
-    <div class="glow b"></div>
-  </div>
+    <script>
+        // 天气数据模拟
+        const weatherTypes = ['sunny', 'cloudy', 'rainy', 'snowy', 'stormy'];
+        const weatherIcons = {
+            sunny: '☀️',
+            cloudy: '☁️',
+            rainy: '🌧️',
+            snowy: '❄️',
+            stormy: '⛈️'
+        };
+        const weatherDescriptions = {
+            sunny: '晴天',
+            cloudy: '多云',
+            rainy: '雨天',
+            snowy: '下雪',
+            stormy: '暴风雨'
+        };
 
-  <!-- Lightbox 放大层 -->
-  <div class="lightbox" id="lightbox" aria-modal="true" role="dialog" aria-label="查看大图">
-    <div class="stage">
-      <img id="lb-img" alt="" />
-      <div class="lb-cap" id="lb-cap"></div>
-      <div class="hint">点击空白处关闭 · ESC 关闭</div>
-    </div>
-  </div>
-
-  <script>
-    // 图片配置（也可替换为本地 /images/*.jpg 相对路径）
-    const images = [
-      { src: "images/015ad8c8e763cd696a4bde91146ae30e.jpg", alt: "抽象霓虹背景", caption: "Image 1" },
-      { src: "images/bd0fd08f64bba0ad4ab06e3c1aad5fa6.jpg", alt: "雪山与星空", caption: "Image 2" },
-      { src: "images/aae907f158f3743301a6667609024164.jpg", alt: "沙漠公路", caption: "Image 3" },
-      { src: "images/2e0bb3ee90f0b466c06dc322d508f267.jpg", alt: "城市夜景", caption: "Image 4" },
-    ];
-
-    const track = document.getElementById('track');
-    const dotsEl = document.getElementById('dots');
-    const bar = document.getElementById('bar');
-    const prevBtn = document.getElementById('prev');
-    const nextBtn = document.getElementById('next');
-
-    // Lightbox refs
-    const lightbox = document.getElementById('lightbox');
-    const lbImg = document.getElementById('lb-img');
-    const lbCap = document.getElementById('lb-cap');
-    let lbIndex = 0;
-
-    let current = 0;                    // 当前索引
-    const autoplayMs = 4200;            // 自动播放间隔
-    let autoTimer = null;
-    let isHovering = false;
-
-    // 邻近预加载：避免切换时出现黑屏/闪烁
-    function ensureLoaded(i){
-      const s = slides[i]; if (!s) return;
-      const img = s.querySelector('img');
-      if (img && !img.src) img.src = img.dataset.src;
-    }
-    function preloadAround(center, radius=2){
-      for (let k=-radius; k<=radius; k++) ensureLoaded(mod(center + k, N));
-    }
-
-    function createSlide({src, alt, caption}, i) {
-      const li = document.createElement('article');
-      li.className = 'slide';
-      li.setAttribute('role', 'listitem');
-      li.setAttribute('data-index', i);
-
-      const img = document.createElement('img');
-      img.alt = alt || '';
-      img.loading = i < 2 ? 'eager' : 'lazy'; // 首屏两张优先加载
-      img.decoding = 'async';
-      img.dataset.src = src; // 懒加载：由 IO 或预加载触发
-
-      const cap = document.createElement('div');
-      cap.className = 'caption';
-      cap.textContent = caption || '';
-
-      li.appendChild(img);
-      li.appendChild(cap);
-
-      // 点击进入 Lightbox
-      li.addEventListener('click', () => openLightbox(i));
-
-      return li;
-    }
-
-    const slides = images.map(createSlide);
-    slides.forEach(s => track.appendChild(s));
-
-    // dots
-    images.forEach((_, i) => {
-      const b = document.createElement('button');
-      b.className = 'dot'; b.setAttribute('aria-label', `跳转到第 ${i+1} 张`);
-      b.addEventListener('click', () => jumpTo(i));
-      dotsEl.appendChild(b);
-    });
-
-    // 懒加载（视口 IO + 邻近预加载双保险）
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          const img = e.target; if (!img.src) img.src = img.dataset.src; io.unobserve(img);
+        // 初始城市数据
+        // Local storage key and helpers
+        const STORAGE_KEY = 'weather_cards_v1';
+        function loadCards() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const arr = JSON.parse(raw);
+                    if (Array.isArray(arr) && arr.every(o => o && typeof o.id === 'number' && typeof o.city === 'string')) {
+                        return arr;
+                    }
+                }
+            } catch (e) {}
+            return [
+                { id: 1, city: 'Beijing' },
+                { id: 2, city: 'Shanghai' },
+                { id: 3, city: 'Guangzhou' },
+                { id: 4, city: 'Chengdu' }
+            ];
         }
-      });
-    }, { root: null, rootMargin: '200px' }); // 使用视口作为 root，更稳定
-    slides.forEach(slide => io.observe(slide.querySelector('img')));
+        function saveCards() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cards)); } catch (e) {} }
 
-    const N = images.length;
-    function mod(n, m){ return ((n % m) + m) % m; }
-    function offsetOf(i){
-      let raw = i - current;
-      if (raw > N/2) raw -= N; else if (raw < -N/2) raw += N;
-      return raw; // -N/2..N/2 之间的最短偏移
+        let cards = loadCards();
+
+        // 生成背景粒子
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = "particle";
+                particle.style.width = Math.random() * 60 + 20 + "px";
+                particle.style.height = particle.style.width;
+                particle.style.left = Math.random() * 100 + "%";
+                particle.style.animationDelay = Math.random() * 15 + "s";
+                particle.style.animationDuration = (Math.random() * 10 + 10) + "s";
+                particlesContainer.appendChild(particle);
+            }
+        }
+        function codeToType(code) {
+            code = Number(code);
+            if (code === 0) return 'sunny';
+            if (code >= 1 && code <= 3) return 'cloudy';
+            if (code === 45 || code === 48) return 'cloudy';
+            if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'rainy';
+            if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) return 'snowy';
+            if (code >= 95) return 'stormy';
+            return 'cloudy';
+        }
+
+        async function geocodeCity(name) {
+            const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=zh&format=json`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('地理编码失败');
+            const data = await res.json();
+            if (!data.results || !data.results.length) throw new Error('未找到该城市');
+            const r = data.results[0];
+            return { lat: r.latitude, lon: r.longitude, resolvedName: r.name };
+        }
+
+        async function fetchWeatherForCity(city) {
+            const { lat, lon, resolvedName } = await geocodeCity(city);
+            const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&current=relative_humidity_2m&hourly=relative_humidity_2m&timezone=auto&forecast_days=1`;
+            const wRes = await fetch(weatherUrl);
+            if (!wRes.ok) throw new Error('天气获取失败');
+            const wJson = await wRes.json();
+            const cw = wJson.current_weather || {};
+            let humidity = (wJson.current && typeof wJson.current.relative_humidity_2m === 'number')
+                ? wJson.current.relative_humidity_2m
+                : null;
+            if (humidity == null && wJson.hourly && Array.isArray(wJson.hourly.time) && Array.isArray(wJson.hourly.relative_humidity_2m)) {
+                let idx = wJson.hourly.time.indexOf(cw.time);
+                if (idx === -1) {
+                    try {
+                        const cwDate = cw.time ? new Date(cw.time) : null;
+                        if (cwDate) {
+                            const times = wJson.hourly.time;
+                            for (let i = times.length - 1; i >= 0; i--) {
+                                const t = new Date(times[i]);
+                                if (t <= cwDate) { idx = i; break; }
+                            }
+                        }
+                    } catch (_) {}
+                }
+                if (idx === -1) idx = wJson.hourly.relative_humidity_2m.length - 1;
+                if (idx >= 0 && wJson.hourly.relative_humidity_2m[idx] != null) {
+                    humidity = wJson.hourly.relative_humidity_2m[idx];
+                }
+            }
+            let aqi = null;
+            try {
+                const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=us_aqi&timezone=auto&forecast_days=1`;
+                const aqRes = await fetch(aqUrl);
+                if (aqRes.ok) {
+                    const aqJson = await aqRes.json();
+                    if (aqJson.hourly && Array.isArray(aqJson.hourly.time) && Array.isArray(aqJson.hourly.us_aqi)) {
+                        const idx = aqJson.hourly.time.indexOf(cw.time);
+                        aqi = idx !== -1 ? aqJson.hourly.us_aqi[idx] : aqJson.hourly.us_aqi[aqJson.hourly.us_aqi.length - 1];
+                    }
+                }
+            } catch (e) {}
+            return {
+                city: resolvedName || city,
+                temperature: cw.temperature,
+                wind: cw.windspeed,
+                weatherCode: cw.weathercode,
+                humidity,
+                aqi
+            };
+        }
+
+        function updateCardWithData(card, data) {
+            const type = codeToType(data.weatherCode);
+            card.classList.remove('loading', 'sunny', 'cloudy', 'rainy', 'snowy', 'stormy');
+            card.classList.add(type);
+            const cityInput = card.querySelector('.city-name');
+            if (cityInput && data.city) cityInput.value = data.city;
+            const iconEl = card.querySelector('.weather-icon');
+            if (iconEl) iconEl.textContent = weatherIcons[type] || '⛅';
+            const tempEl = card.querySelector('.temperature');
+            if (tempEl) tempEl.textContent = `${Math.round(data.temperature)}°C`;
+            const descEl = card.querySelector('.weather-desc');
+            if (descEl) descEl.textContent = weatherDescriptions[type] || '';
+            const humEl = card.querySelector('.detail-value[data-field="humidity"]');
+            if (humEl) humEl.textContent = (data.humidity ?? '--') + (data.humidity != null ? '%' : '');
+            const windEl = card.querySelector('.detail-value[data-field="wind"]');
+            if (windEl) windEl.textContent = (data.wind != null ? Math.round(data.wind) + 'km/h' : '--');
+            const aqiEl = card.querySelector('.detail-value[data-field="aqi"]');
+            if (aqiEl) aqiEl.textContent = (data.aqi != null ? Math.round(data.aqi) : '--');
+        }
+
+        async function fetchAndRender(card, city) {
+            try {
+                card.classList.add('loading');
+                const data = await fetchWeatherForCity(city);
+                updateCardWithData(card, data);
+            } catch (e) {
+                card.classList.remove('loading');
+                const descEl = card.querySelector('.weather-desc');
+                if (descEl) descEl.textContent = '获取失败';
+            }
+        }
+function createWeatherCard(cardData) {
+    const card = document.createElement('div');
+    card.className = 'weather-card loading';
+    card.style.animationDelay = (Math.random() * 0.3) + 's';
+
+    card.innerHTML = `
+        <div class="card-header">
+            <input 
+                type="text" 
+                class="city-name" 
+                value="${cardData.city}"
+                onchange="updateCity(${cardData.id}, this.value, this)"
+                onclick="event.stopPropagation()"
+            />
+            <button class="delete-btn" onclick="deleteCard(${cardData.id})" title="删除卡片">
+                ×
+            </button>
+        </div>
+
+        <div class="weather-icon">⏳</div>
+        
+        <div class="temperature">--°C</div>
+        <div class="weather-desc">加载中…</div>
+
+        <div class="weather-details">
+            <div class="detail-item">
+                <div class="detail-icon">💧</div>
+                <div class="detail-label">湿度</div>
+                <div class="detail-value" data-field="humidity">--</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-icon">🍃</div>
+                <div class="detail-label">风速</div>
+                <div class="detail-value" data-field="wind">--</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-icon">🫧</div>
+                <div class="detail-label">空气质量</div>
+                <div class="detail-value" data-field="aqi">--</div>
+            </div>
+        </div>
+
+        <div class="refresh-icon" onclick="refreshCard(${cardData.id})" title="刷新天气">
+            🔄
+        </div>
+    `;
+
+    fetchAndRender(card, cardData.city);
+    return card;
+}
+
+        // 渲染所有卡片
+                function renderCards() {
+            const grid = document.getElementById('cardsGrid');
+            grid.innerHTML = '';
+            cards.forEach(cardData => {
+                const card = createWeatherCard(cardData);
+                grid.appendChild(card);
+            });
+        }
+
+        // 新增卡片
+        function addNewCard() {
+            const newId = cards.length > 0 ? Math.max(...cards.map(c => c.id)) + 1 : 1;
+                        const cities = ['Beijing', 'Nanjing', 'Xiamen', 'Hangzhou', 'Guangzhou', 'Changsha', 'Qingdao', 'Tianjin', 'Chongqing', 'Wuhan'];
+            const randomCity = cities[Math.floor(Math.random() * cities.length)];
+            cards.push({ id: newId, city: randomCity });
+            saveCards();
+            renderCards();
+        }
+
+        // 删除卡片
+        function deleteCard(id) {
+            if (cards.length <= 1) {
+                alert('至少保留一张卡片哦~');
+                return;
+            }
+            cards = cards.filter(card => card.id !== id);
+            saveCards();
+            renderCards();
+        }
+
+        // 更新城市并重新拉取
+        function updateCity(id, newCity, inputEl) {
+    const card = cards.find(c => c.id === id);
+    if (card) {
+        card.city = newCity || '未命名城市';
+        saveCards();
+        const cardElement = inputEl && inputEl.closest ? inputEl.closest('.weather-card') : null;
+        if (cardElement) {
+            fetchAndRender(cardElement, card.city);
+        } else {
+            renderCards();
+        }
     }
+}
 
-    // 低性能/小屏禁用模糊滤镜，减少合成层数量
-    const ENABLE_FILTER = !window.matchMedia('(max-width: 640px)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        // 刷新单张卡片（重新获取真实天气）
+        function refreshCard(id) {
+            event.stopPropagation();
+            const cardData = cards.find(c => c.id === id);
+            if (!cardData) return;
+            const cardElement = event.target.closest('.weather-card');
+            if (!cardElement) return;
+            cardElement.style.animation = 'none';
+            setTimeout(() => {
+                cardElement.style.animation = 'cardFadeIn 0.6s ease';
+            }, 10);
+            const city = cardElement.querySelector('.city-name')?.value || cardData.city;
+            fetchAndRender(cardElement, city);
+        }
 
-    function render(progress = 0){
-      slides.forEach((slide, i) => {
-        const off = offsetOf(i) - progress;
-        const abs = Math.abs(off);
-        const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap'));
-        const depth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--depth-step'));
-        const x = off * gap;
-        const z = -abs * depth;
-        const ry = `calc(${off} * var(--rotate-step))`;
-        const scale = Math.max(.6, 1 - abs * .08 - Math.pow(abs, 1.3) * .02);
+        // 初始化
+        createParticles();
+        renderCards();
+        saveCards();
 
-        slide.style.transform = `translate3d(${x}px, 0, ${z}px) rotateY(${ry}) scale(${scale})`;
-        slide.style.zIndex = String(1000 - Math.round(abs * 10));
-        slide.style.opacity = String(1 - Math.min(.06 * abs, .5));
-        slide.style.filter = ENABLE_FILTER ? `blur(${Math.max(0, abs - 1) * 0.8}px)` : 'none';
-        slide.setAttribute('aria-hidden', abs > .01);
-      });
-
-      // 进度条
-      const pct = (mod(current, N) + 1) / N * 100; bar.style.width = pct + '%';
-
-      // dot 高亮
-      ;[...dotsEl.children].forEach((d, i) => d.setAttribute('aria-current', i === mod(current, N)));
-
-      // 邻近预加载（当前±2）
-      preloadAround(current, 2);
-    }
-
-    function jumpTo(i){ current = mod(i, N); render(); restartAutoplay(); }
-    function next(){ current = mod(current + 1, N); render(); }
-    function prev(){ current = mod(current - 1, N); render(); }
-
-    // 交互：按钮 / 键盘 / 滚轮 / 触控拖拽
-    nextBtn.addEventListener('click', next);
-    prevBtn.addEventListener('click', prev);
-
-    window.addEventListener('keydown', (e) => { 
-      if (lightbox.classList.contains('open')) {
-        if (e.key === 'Escape') closeLightbox();
-        if (e.key === 'ArrowRight') lbGo(1);
-        if (e.key === 'ArrowLeft') lbGo(-1);
-        return;
-      }
-      if (e.key === 'ArrowRight') next(); else if (e.key === 'ArrowLeft') prev(); 
-    });
-
-    let wheelLock = false;
-    window.addEventListener('wheel', (e) => {
-      if (lightbox.classList.contains('open')) return; // 打开大图时不处理滚轮
-      if (wheelLock) return; wheelLock = true; setTimeout(() => wheelLock = false, 320);
-      if (Math.abs(e.deltaX) + Math.abs(e.deltaY) < 6) return;
-      if (e.deltaX > 0 || e.deltaY > 0) next(); else prev();
-    }, { passive: true });
-
-    const gallery = document.getElementById('gallery');
-    gallery.addEventListener('pointerenter', () => { isHovering = true; stopAutoplay(); });
-    gallery.addEventListener('pointerleave', () => { isHovering = false; restartAutoplay(); });
-
-    let dragging = false, startX = 0, lastX = 0, progress = 0;
-    const DRAG_THRESHOLD = 60;
-    function onDown(e){ if (lightbox.classList.contains('open')) return; dragging = true; startX = (e.touches? e.touches[0].clientX : e.clientX); lastX = startX; stopAutoplay(); }
-    function onMove(e){ if (!dragging) return; const x = (e.touches? e.touches[0].clientX : e.clientX); const dx = x - startX; lastX = x; const w = Math.min(window.innerWidth, parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--slide-width'))); progress = Math.max(-1, Math.min(1, dx / w)); render(progress * .8); }
-    function onUp(){ if (!dragging) return; const dx = lastX - startX; if (dx > DRAG_THRESHOLD) prev(); else if (dx < -DRAG_THRESHOLD) next(); else render(0); dragging = false; progress = 0; if (!isHovering) restartAutoplay(); }
-
-    gallery.addEventListener('pointerdown', onDown);
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onUp);
-    gallery.addEventListener('touchstart', onDown, { passive: true });
-    window.addEventListener('touchmove', onMove, { passive: false });
-    window.addEventListener('touchend', onUp);
-
-    function startAutoplay(){ if (autoTimer) return; autoTimer = setInterval(next, autoplayMs); }
-    function stopAutoplay(){ if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } }
-    function restartAutoplay(){ stopAutoplay(); startAutoplay(); }
-
-    // —— Lightbox 逻辑 ——
-    function openLightbox(i){
-      lbIndex = i;
-      const item = images[lbIndex];
-      lbImg.src = item.src;
-      lbImg.alt = item.alt || '';
-      lbCap.textContent = item.caption || '';
-      lightbox.classList.add('open');
-      document.body.style.overflow = 'hidden';
-    }
-    function closeLightbox(){
-      lightbox.classList.remove('open');
-      document.body.style.overflow = '';
-    }
-    function lbGo(delta){
-      lbIndex = (lbIndex + delta + images.length) % images.length;
-      const item = images[lbIndex];
-      lbImg.src = item.src; lbImg.alt = item.alt || ''; lbCap.textContent = item.caption || '';
-    }
-    lightbox.addEventListener('click', closeLightbox);
-    lbImg.addEventListener('click', (e) => e.stopPropagation()); // 点击图片不关闭
-
-    // 初始：渲染并预加载邻近图片
-    render(); startAutoplay(); preloadAround(current, 2);
-
-    // 适配：窗口变化时重新渲染（同时更新过滤策略）
-    window.addEventListener('resize', () => { render(); });
-  </script>
+        // 如需自动刷新真实数据，可启用以下代码（默认关闭）
+        // setInterval(() => {
+        //     document.querySelectorAll('.weather-card').forEach(card => {
+        //         const city = card.querySelector('.city-name')?.value;
+        //         if (city) fetchAndRender(card, city);
+        //     });
+        // }, 10 * 60 * 1000);
+    </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
