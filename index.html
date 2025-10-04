@@ -174,6 +174,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            position: relative;
+            z-index: 10;
         }
 
         .city-name {
@@ -186,6 +188,9 @@
             transition: all 0.3s ease;
             outline: none;
             cursor: pointer;
+            flex: 1;
+            min-width: 0;
+            margin-right: 10px;
         }
 
         .city-name:hover {
@@ -197,19 +202,24 @@
         }
 
         .delete-btn {
-            background: linear-gradient(135deg, #ff6b6b, #ff5252);
+            background: #ff4444;
             color: white;
-            border: none;
+            border: 3px solid white;
             width: 35px;
             height: 35px;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 1.2rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            line-height: 1;
             transition: all 0.3s ease;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 5px 15px rgba(255,82,82,0.3);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            position: relative;
+            z-index: 100;
+            flex-shrink: 0;
         }
 
         .delete-btn:hover {
@@ -560,9 +570,7 @@ function createWeatherCard(cardData) {
                 onchange="updateCity(${cardData.id}, this.value, this)"
                 onclick="event.stopPropagation()"
             />
-            <button class="delete-btn" onclick="deleteCard(${cardData.id})" title="删除卡片">
-                ×
-            </button>
+            <button class="delete-btn" onclick="event.stopPropagation(); deleteCard(${cardData.id})" title="删除卡片">✕</button>
         </div>
 
         <div class="weather-icon">⏳</div>
@@ -588,7 +596,7 @@ function createWeatherCard(cardData) {
             </div>
         </div>
 
-        <div class="refresh-icon" onclick="refreshCard(${cardData.id})" title="刷新天气">
+        <div class="refresh-icon" onclick="event.stopPropagation(); refreshCard(${cardData.id}, event)" title="刷新天气">
             🔄
         </div>
     `;
@@ -644,8 +652,7 @@ function createWeatherCard(cardData) {
 }
 
         // 刷新单张卡片（重新获取真实天气）
-        function refreshCard(id) {
-            event.stopPropagation();
+        function refreshCard(id, event) {
             const cardData = cards.find(c => c.id === id);
             if (!cardData) return;
             const cardElement = event.target.closest('.weather-card');
@@ -673,12 +680,3 @@ function createWeatherCard(cardData) {
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
